@@ -18,7 +18,7 @@ df = cleaner.process_all()
 # -----------------------------
 # 1) 从重复测量数据构建“生存”记录（按孕妇）
 # -----------------------------
-def construct_patient_intervals(df, pid_col='pid', week_col='gest_week_orig', y_col='y_conc', threshold=0.04):
+def construct_patient_intervals(df, pid_col='pid', week_col='gest_week', y_col='y_conc', threshold=0.04):
     """
     对每个孕妇按孕周排序，如果出现从 <threshold 到 >=threshold 的第一次跃升，
     则定义达标区间 (L, R] = (week_{i-1}, week_i].
@@ -226,7 +226,7 @@ def find_tstar_from_S(times, S_group, alpha=2.0, beta=1.0):
 def pipeline_cox_clustering(
     df_measurements,
     pid_col='pid',
-    week_col='gest_week_orig',
+    week_col='gest_week',
     y_col='y_conc',
     covariate_cols=['bmi'],
     cox_covariates=['bmi'],  # covariates to use in Cox
@@ -497,9 +497,9 @@ def summarize_clusters_BMI_tstar_and_gest(df, results):
     cluster_results = results['cluster_results']
     bootstrap_summary = results['bootstrap_summary']
 
-    # 原始孕周：从 df_measurements 的第一条记录取 gest_week_orig
-    df_orig = df.sort_values(['pid', 'gest_week_orig']).groupby('pid').first()
-    gest_orig = df_orig['gest_week_orig']
+    # 原始孕周：从 df_measurements 的第一条记录取 gest_week
+    df_orig = df.sort_values(['pid', 'gest_week']).groupby('pid').first()
+    gest_orig = df_orig['gest_week']
 
     rows = []
     for c in sorted(cluster_results.keys()):
@@ -587,7 +587,7 @@ sim_results = measurement_error_simulation(
     n_sim=n_sim,
     noise_sds=noise_sds,
     random_seed=2025,
-    pid_col='pid', week_col='gest_week_orig', y_col='y_conc',
+    pid_col='pid', week_col='gest_week', y_col='y_conc',
     covariate_cols=['bmi'], cox_covariates=['bmi'],
     threshold=0.04, time_mode='right', k_clusters=3,
     alpha=2.0, beta=1.0, times_step=0.2, n_boot=50,
@@ -606,7 +606,7 @@ for sd, df_t in sim_results.items():
             gest_weeks = []
         else:
             # 用原始孕周（未标准化）
-            gest_weeks = df.loc[members, 'gest_week_orig'].values
+            gest_weeks = df.loc[members, 'gest_week'].values
 
         if arr.size == 0:
             me_err_summary_rows.append({
