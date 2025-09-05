@@ -153,7 +153,7 @@ def predict_survival_matrix(cph, cov_df_for_predict, times):
 # -----------------------------
 # 5) Hierarchical clustering on features [bmi, LP]
 # -----------------------------
-def cluster_patients(bmi_arr, lp_arr, k=3, plot_dendrogram=False, plot_fname=None):
+def cluster_patients(bmi_arr, lp_arr, k=4, plot_dendrogram=False, plot_fname=None):
     """
     bmi_arr, lp_arr: 1D arrays with same order (index alignment)
     returns labels (1..k), scaler object, centers (k x features)
@@ -232,7 +232,7 @@ def pipeline_cox_clustering(
     cox_covariates=['bmi'],  # covariates to use in Cox
     threshold=0.04,
     time_mode='right',   # 'right' or 'midpoint'
-    k_clusters=3,
+    k_clusters=4,
     alpha=2.0,
     beta=1.0,
     times_step=0.2,
@@ -589,7 +589,7 @@ sim_results = measurement_error_simulation(
     random_seed=2025,
     pid_col='pid', week_col='gest_week', y_col='y_conc',
     covariate_cols=['bmi'], cox_covariates=['bmi'],
-    threshold=0.04, time_mode='right', k_clusters=3,
+    threshold=0.04, time_mode='right', k_clusters=4,
     alpha=2.0, beta=1.0, times_step=0.2, n_boot=50,
     scale_covariates=False, plot_dendrogram=False
 )
