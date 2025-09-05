@@ -170,23 +170,7 @@ class CleanData:
         # ⚠️ 不直接 drop，保留标记，敏感性分析时可用：
         # self.df_clean = self.df[~self.df[outlier_cols].any(axis=1)].reset_index(drop=True)
 
-    def feature_scaling(self):
-        """选择性特征标准化"""
-        scale_cols = [
-            "age", "height", "weight", "bmi", "gest_week",
-            "reads_total", "reads_unique", "map_ratio", "dup_ratio", 
-            "filter_ratio", "gc_ratio", "y_conc", "x_conc"
-        ]
-
-        # 保留原始gest_week
-        self.df["gest_week_orig"] = self.df["gest_week"].copy()
-
-        scaler = StandardScaler()
-        for col in scale_cols:
-            if col in self.df.columns:
-                self.df[col] = scaler.fit_transform(self.df[[col]]).flatten()
-
-        # Z值相关特征不需要标准化，因为它们已经是标准化值
+   
 
     def create_interaction_features(self):
         """创建交互特征"""
@@ -281,9 +265,7 @@ class CleanData:
         self.outlier_detection()
         print("✓ 异常值检测完成")
         
-        # 7. 特征缩放
-        self.feature_scaling()
-        print("✓ 特征缩放完成")
+
         
         # 8. 创建交互特征
         self.create_interaction_features()
