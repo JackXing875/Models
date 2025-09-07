@@ -1,8 +1,7 @@
 import pandas as pd
 import numpy as np
 from scipy.stats import spearmanr
-from pygam import LinearGAM, s, l, te
-from sklearn.utils import resample
+from pygam import LinearGAM, s, te
 from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
 from sklearn.tree import DecisionTreeRegressor, plot_tree
@@ -11,19 +10,14 @@ from sklearn.preprocessing import PolynomialFeatures, StandardScaler
 from sklearn.linear_model import LassoCV
 from sklearn.pipeline import Pipeline
 
-
-# =====================
-# 1. Spearman相关系数
-# =====================
-def compute_spearman(df, cols):
+# Spearman相关系数
+def spearman(df, cols):
     corr, pval = spearmanr(df[cols])
     print("Spearman相关系数矩阵：\n", corr)
     return corr, pval
 
-# =====================
-# 2. 二维平滑热力图（局部均值与标准差）
-# =====================
-def plot_heatmap(df, x='gest_week', y='bmi', target='y_conc', h1=1, h2=1, grid_size=50):
+# 二维平滑热力图
+def heatmap(df, x='gest_week', y='bmi', target='y_conc', h1=1, h2=1, grid_size=50):
     x_min, x_max = df[x].min(), df[x].max()
     y_min, y_max = df[y].min(), df[y].max()
     x_grid = np.linspace(x_min, x_max, grid_size)
@@ -50,25 +44,20 @@ def plot_heatmap(df, x='gest_week', y='bmi', target='y_conc', h1=1, h2=1, grid_s
     
     plt.show()
 
-# =====================
-# 3. 回归树
-# =====================
 def regression_tree(df, target='y_conc', features=None, max_depth=3, min_samples_leaf=10, plot=True):
     """
-    回归树 + 输出特征重要性
+    回归树
     """
     X = df[features].values
     y = df[target].values
     tree = DecisionTreeRegressor(max_depth=max_depth, min_samples_leaf=min_samples_leaf)
     tree.fit(X, y)
     
-    # 可视化决策树
     if plot:
         plt.figure(figsize=(15,8))
         plot_tree(tree, feature_names=features, filled=True, fontsize=10)
         plt.show()
     
-    # 输出特征重要性
     importances = tree.feature_importances_
     feature_importance_dict = {f: imp for f, imp in zip(features, importances)}
     print("特征重要性：")
@@ -78,10 +67,9 @@ def regression_tree(df, target='y_conc', features=None, max_depth=3, min_samples
     return tree, feature_importance_dict
 
 
-def lasso_poly_selection(df, target='y_conc', features=None, degree=2, cv=5, random_state=2025):
+def Lasso(df, target='y_conc', features=None, degree=2, cv=5, random_state=2025):
     """
-    多项式扩展 + LassoCV 特征选择
-    df: DataFrame
+    多项式扩展 + Lasso 特征选择
     target: 目标变量
     features: 自变量列表
     degree: 多项式阶数
@@ -100,7 +88,6 @@ def lasso_poly_selection(df, target='y_conc', features=None, degree=2, cv=5, ran
     lasso = pipe.named_steps['lasso']
     poly = pipe.named_steps['poly']
     
-    # 提取特征名
     feature_names = poly.get_feature_names_out(features)
     coef = lasso.coef_
     
@@ -113,30 +100,23 @@ def lasso_poly_selection(df, target='y_conc', features=None, degree=2, cv=5, ran
     
     return selected, pipe
 
-def get_selected_features_from_lasso(selected, features_all):
+def get_features(selected, features_all):
     """
-    从 Lasso 结果里提取原始自变量名（去掉多项式展开的高阶符号）
+    从 Lasso 结果里提取原始自变量名
     """
     raw_selected = []
     for f, c in selected:
         for orig in features_all:
-            if orig in f:   # 只要多项式里包含这个原始特征，就认为它有用
+            if orig in f:  
                 raw_selected.append(orig)
-    # 去重
     return list(set(raw_selected))
 
-
-# =====================
-# 4. GAMM 拟合
-# =====================
-
+# GAMM 拟合
 def fit_gamm(df, target='y_conc', covariates=None):
     """
-    df: DataFrame, 已处理好的数据
     target: 目标变量列名
-    covariates: 额外协变量列表（Lasso筛选后）
+    covariates: 额外协变量列表
     """
-    # 保证 covariates 不重复
     smooth_vars = ['gest_week', 'bmi']
     if covariates:
         covariates = [v for v in covariates if v not in smooth_vars]
@@ -145,25 +125,20 @@ def fit_gamm(df, target='y_conc', covariates=None):
     X_smooth = df[smooth_vars].values
     y = df[target].values
 
-    # 构建 term
     terms = te(0,1)  # gest_week × bmi 二维平滑
     if covariates:
         X_cov = df[covariates].values
         X = np.hstack([X_smooth, X_cov])
-        # 对额外协变量添加平滑 s(i) 或线性项，这里用线性
         for i in range(X_smooth.shape[1], X.shape[1]):
-            terms = terms + s(i)  # 如果想做线性，可以换成 l(i)
+            terms = terms + s(i) 
     else:
         X = X_smooth
 
     gam = LinearGAM(terms).fit(X, y)
     return gam, X, y
 
-
-# =====================
-# 5. 置换检验
-# =====================
-def permutation_test_gamm(df, target='y_conc', covariates=None, n_perm=200):
+# 置换检验
+def permutation_test(df, target='y_conc', covariates=None, n_perm=200):
     gam, X, y = fit_gamm(df, target, covariates)
     original_coefs = gam.coef_
 
@@ -182,11 +157,8 @@ def permutation_test_gamm(df, target='y_conc', covariates=None, n_perm=200):
     p_values = np.mean(np.abs(perm_coefs) >= np.abs(original_coefs), axis=0)
     return p_values
 
-# =====================
-# 6.Bootstrap
-# =====================
-
-def bootstrap_gamm(df, target='y_conc', covariates=None, n_boot=200):
+# Bootstrap
+def bootstrap(df, target='y_conc', covariates=None, n_boot=200):
     unique_pids = df['pid'].unique()
     boot_coefs = []
 
@@ -201,22 +173,20 @@ def bootstrap_gamm(df, target='y_conc', covariates=None, n_boot=200):
     ci_upper = np.percentile(boot_coefs, 97.5, axis=0)
     return ci_lower, ci_upper
 
-def plot_y_conc_contour(df, x='gest_week', y='bmi', target='y_conc', h1=1, h2=1, grid_size=50):
+def draw(df, x='gest_week', y='bmi', target='y_conc', h1=1, h2=1, grid_size=50):
     """
     绘制Y浓度随孕周和BMI变化的热力图和等高线
-    - df: 已处理数据
     - x, y: 自变量列名
     - target: Y浓度
     - h1, h2: 高斯核带宽
     - grid_size: 网格分辨率
     """
-    # 网格
     x_min, x_max = df[x].min(), df[x].max()
     y_min, y_max = df[y].min(), df[y].max()
     x_grid = np.linspace(x_min, x_max, grid_size)
     y_grid = np.linspace(y_min, y_max, grid_size)
 
-    mu = np.zeros((grid_size, grid_size))  # 局部均值
+    mu = np.zeros((grid_size, grid_size))
 
     # 二维高斯平滑
     for i, u in enumerate(x_grid):
@@ -224,13 +194,14 @@ def plot_y_conc_contour(df, x='gest_week', y='bmi', target='y_conc', h1=1, h2=1,
             w = np.exp(-((df[x]-u)**2)/(2*h1**2) - ((df[y]-v)**2)/(2*h2**2))
             mu[i,j] = np.sum(w*df[target])/np.sum(w)
 
-    # 绘图
     X, Y = np.meshgrid(x_grid, y_grid)
     plt.figure(figsize=(10,7))
+
     # 热力图
     plt.contourf(X, Y, mu.T, 20, cmap='viridis')
     plt.colorbar(label='Y浓度')
-    # 等高线
+    
+    # 等高线图
     cs = plt.contour(X, Y, mu.T, colors='white', linewidths=1.2)
     plt.clabel(cs, fmt="%.2f", colors='white')
     
@@ -239,9 +210,7 @@ def plot_y_conc_contour(df, x='gest_week', y='bmi', target='y_conc', h1=1, h2=1,
     plt.title('Y浓度随孕周和BMI的变化（局部均值 + 等高线）')
     plt.show()
 
-# =====================
-# 7. 主流程示例
-# =====================
+
 if __name__ == "__main__":
     path = r"D:\RUC\国赛\附件.xlsx"
     cleaner = CleanData(path)
@@ -249,14 +218,14 @@ if __name__ == "__main__":
 
     print(df.columns)
 
-    plt.rcParams['font.sans-serif'] = ['SimHei']  # 设置中文字体为黑体
+    plt.rcParams['font.sans-serif'] = ['SimHei'] 
     plt.rcParams['axes.unicode_minus'] = False
     # Spearman
     cols_corr = ['gest_week','bmi','y_conc','reads_total','gc_ratio']
-    compute_spearman(df, cols_corr)
+    spearman(df, cols_corr)
     
     # 热力图
-    plot_heatmap(df)
+    heatmap(df)
     
     # 决策树
     tree_features = ['gest_week','bmi','age','reads_total','gc_ratio']
@@ -264,22 +233,38 @@ if __name__ == "__main__":
 
     # Lasso 特征选择
     features_all = ['gest_week','bmi','age','reads_total','gc_ratio']
-    selected, lasso_pipe = lasso_poly_selection(df, target='y_conc', features=features_all, degree=2)
+    selected, lasso_pipe = Lasso(df, target='y_conc', features=features_all, degree=2)
 
     # 自动传递给 GAMM
-    covariates = get_selected_features_from_lasso(selected, features_all)
+    covariates = get_features(selected, features_all)
     print("传递给 GAMM 的自变量：", covariates)
 
     gam_model, X, y = fit_gamm(df, covariates=covariates)
     print("GAMM 拟合完成")
 
     # 置换检验
-    p_values_perm = permutation_test_gamm(df, covariates=covariates, n_perm=200)  # 可调大
+    p_values_perm = permutation_test(df, covariates=covariates, n_perm=200)  # 可调大
     print("置换检验p值：", p_values_perm)
     
     # Bootstrap
-    ci_lower, ci_upper = bootstrap_gamm(df, covariates=covariates, n_boot=200)  # 可调大
+    ci_lower, ci_upper = bootstrap(df, covariates=covariates, n_boot=200)  # 可调大
     print("Bootstrap 95% CI下限：", ci_lower)
     print("Bootstrap 95% CI上限：", ci_upper)
 
-    plot_y_conc_contour(df)
+    draw(df)
+
+    X, Y = np.meshgrid(np.linspace(df['gest_week'].min(), df['gest_week'].max(), 50),
+                    np.linspace(df['bmi'].min(), df['bmi'].max(), 50))
+    Z = np.zeros_like(X)
+    # 用你的高斯平滑结果填充 Z
+    for i in range(X.shape[0]):
+        for j in range(X.shape[1]):
+            w = np.exp(-((df['gest_week']-X[i,j])**2)/(2*1**2) - ((df['bmi']-Y[i,j])**2)/(2*1**2))
+            Z[i,j] = np.sum(w*df['y_conc']) / np.sum(w)
+
+    fig = plt.figure(figsize=(12,6))
+    ax = fig.add_subplot(111, projection='3d')
+    surf = ax.plot_surface(X, Y, Z, cmap='viridis', edgecolor='k')
+    fig.colorbar(surf, shrink=0.5, aspect=10, label='Y浓度')
+    ax.set_xlabel('孕周'); ax.set_ylabel('BMI'); ax.set_zlabel('Y浓度')
+    plt.show()
