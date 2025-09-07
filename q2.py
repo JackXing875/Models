@@ -97,32 +97,19 @@ def fit_cox(df_surv, cov_df, covariates, duration_col='duration', event_col='eve
 
 # 计算每个个体的生存函数矩阵 S(t)
 def survival_matrix(cph, cov_df_for_predict, times):
-    """
-    cph: fitted CoxPHFitter
-    cov_df_for_predict: DataFrame index=pid with covariates (columns same as used in fit)
-    times: 1D array of times at which to evaluate survival
-    Returns: times (np.array), S (2D np.array shape (n_times, n_individuals)) and pid list
-    """
     covs = cph._covariates
     Xpredict = cov_df_for_predict[covs].copy().reset_index(drop=True)
-    # if scaler used when fitting, apply same transform
     if getattr(cph, '_scaler', None) is not None:
         Xpredict = pd.DataFrame(cph._scaler.transform(Xpredict), columns=covs)
 
-    # lifelines returns DataFrame: index times, columns one per observation (names 0..n-1)
     sf = cph.predict_survival_function(Xpredict, times=times)
-    # sf: DataFrame index=times, columns=0..n-1
-    S = sf.values  # shape (len(times), n_obs)
+    S = sf.values 
     pid_list = cov_df_for_predict.index.to_list()
     return np.array(times), S, pid_list
 
 
 # 基于特征 [bmi, LP] 的层次聚类分析
 def cluster(bmi_arr, lp_arr, k=3, plot_dendrogram=False, plot_fname=None):
-    """
-    bmi_arr, lp_arr: 1D arrays with same order (index alignment)
-    returns labels (1..k), scaler object, centers (k x features)
-    """
     X = np.vstack([bmi_arr, lp_arr]).T
     scaler = StandardScaler()
     Xs = scaler.fit_transform(X)
@@ -148,13 +135,7 @@ def cluster(bmi_arr, lp_arr, k=3, plot_dendrogram=False, plot_fname=None):
 
 
 # 根据分组生存函数（S_group）通过解析公式求 t*：
-def get_tstar(times, S_group, alpha=2.0, beta=1.0):
-    """
-    times: monotone increasing array
-    S_group: array of same length (survival prob at each times element)
-    returns t_star (float) by linear interpolation where S_group crosses q = beta/(alpha+beta).
-    If crossing not found within times, returns times[-1] (or 0 if at start).
-    """
+def get_tstar(times, S_group, alpha=5.0, beta=1.0):
     q = beta / (alpha + beta)
 
     if S_group[0] <= q: return float(times[0])
@@ -182,7 +163,7 @@ def pipeline_cox_clustering(
     threshold=0.04,
     time_mode='right',
     k_clusters=3,
-    alpha=2.0,
+    alpha=5.0,
     beta=1.0,
     times_step=0.2,
     scale_covariates=False,
@@ -269,7 +250,7 @@ def pipeline_cox_clustering(
 
 # Bootstrap 求置信区间 
 def bootstrap(df_measurements, cluster_results, pid_col='pid', week_col='gest_week', y_col='y_conc',
-                    covariate_cols=['bmi'], cox_covariates=['bmi'], alpha=2.0, beta=1.0,
+                    covariate_cols=['bmi'], cox_covariates=['bmi'], alpha=5.0, beta=1.0,
                     times_step=0.2, n_boot=100, scale_covariates=False):
     boot_tstars_per_cluster = {c: [] for c in cluster_results.keys()}
     rng = np.random.RandomState(12345)
@@ -434,7 +415,7 @@ if __name__ == "__main__":
         cluster_results=results['cluster_results'],
         pid_col='pid', week_col='gest_week', y_col='y_conc',
         covariate_cols=['bmi'], cox_covariates=['bmi'],
-        alpha=2.0, beta=1.0, times_step=0.2,
+        alpha=5.0, beta=1.0, times_step=0.2,
         n_boot=200, scale_covariates=False
     )
 
@@ -470,7 +451,7 @@ if __name__ == "__main__":
         pid_col='pid', week_col='gest_week', y_col='y_conc',
         covariate_cols=['bmi'], cox_covariates=['bmi'],
         threshold=0.04, time_mode='right', k_clusters=3,
-        alpha=2.0, beta=1.0, times_step=0.2,
+        alpha=5.0, beta=1.0, times_step=0.2,
         scale_covariates=False, plot_dendrogram=False
     )
 
