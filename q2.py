@@ -16,10 +16,7 @@ def construct_intervals(df, pid_col='pid', week_col='gest_week', y_col='y_conc',
     对每个孕妇按孕周排序，如果出现从 <threshold 到 >=threshold 的第一次跃升，
     则定义达标区间 (L, R] = (week_{i-1}, week_i].
     若首次检测就 >= threshold，则 L = 0, R = week_1.
-    若一直未达标，则视为右删失（L = last_week, R = np.inf, event=0）。
-    返回 DataFrame per-patient：
-      pid, L, R, event_observed (1 if interval observed), last_week,
-      plus baseline covariates chosen (bmi) - we'll attach them later.
+    若一直未达标，则视为右删失
     """
     rows = []
     for pid, g in df.groupby(pid_col):
@@ -338,7 +335,7 @@ def bootstrap(df_measurements, cluster_results, pid_col='pid', week_col='gest_we
             'boot_ci_97.5': ci_high,
             'boot_samples_collected': len(boot_tstars_per_cluster[c])
         }
-        
+
     return {c: list(map(float, vals)) for c, vals in boot_tstars_per_cluster.items()}
 
 # 灵敏度分析
@@ -436,8 +433,6 @@ if __name__ == "__main__":
     df_summary.to_csv("cluster_bmi_tstar_summary.csv", float_format="%.3f")
     print("已保存 cluster_bmi_tstar_summary.csv")
 
-    # ===================== Bootstrap 置信区间 =====================
-    print("\n开始 Bootstrap 计算置信区间")
     boot_res = bootstrap(
         df_measurements=df,
         cluster_results=results['cluster_results'],
