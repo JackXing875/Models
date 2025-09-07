@@ -1,13 +1,9 @@
 import numpy as np
 import pandas as pd
-from lifelines import CoxPHFitter, WeibullAFTFitter
+from lifelines import CoxPHFitter
 from scipy.cluster.hierarchy import linkage, fcluster, dendrogram
-from scipy.spatial.distance import cdist
-from scipy.optimize import linear_sum_assignment
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import silhouette_score
 import matplotlib.pyplot as plt
-import warnings
 from clean_data import CleanData
 
 # 从重复测量数据构建生存记录
